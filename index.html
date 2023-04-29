@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Сверка «Науки логики»</title>
+<style>
+:root {
+  --bgcolor: #7fa2af;
+  --fgcolor: #004b68;
+  --highlight: #fff;
+}
+body {
+  margin: 0;
+  font-family: Verdana, sans-serif;
+  font-size: 12px;
+  color: var(--fgcolor);
+  cursor: default;
+}
+.wrap {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.header {
+  text-align: center;
+  background: var(--bgcolor);
+  border-bottom: 1px solid var(--fgcolor);
+  padding: 4px 3px;
+}
+.display {
+  display: flex;
+  justify-content: stretch;
+  flex: 1;
+}
+.track {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  border-right: 1px solid var(--fgcolor);
+  background: var(--bgcolor);
+}
+.track:last-child {
+  border-right: none;
+}
+.viewer {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  border-bottom: 1px solid var(--fgcolor);
+}
+.viewer:last-child {
+  border-bottom: none;
+}
+.menu {
+  background: var(--fgcolor);
+  color: var(--bgcolor);
+  display: flex;
+}
+.menu .title {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+.menu > * {
+  padding: 3px 5px;
+}
+.menu .page-btn {
+  background: transparent;
+  color: var(--bgcolor);
+  border: none;
+}
+.menu .page-btn:hover {
+  color: var(--highlight);
+}
+.menu .page-btn:hover:active {
+  transform: translate(1px, 1px);
+}
+.menu .page {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.menu .page input {
+  background: transparent;
+  color: var(--bgcolor);
+  border: none;
+  width: 30px;
+  text-align: center;
+  flex: 1;
+  padding: 0;
+}
+.main {
+  flex: 1;
+  user-select: none;
+  background-color: #bdcad0;
+  background-repeat: no-repeat;
+  background-position: 50% 0;
+  background-size: 100%;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="header">
+    Вычитка «Науки логики» Г. В. Ф. Гегеля
+  </header>
+  <main class="display">
+    <section class="track">
+      <article class="viewer">
+        <section class="menu">
+          <div class="title"></div>
+          <button type="button" class="prev page-btn">Предыдущая стр.</button>
+          <div class="page"><input type="text" value="1"></div>
+          <button type="button" class="next page-btn">Следующая стр.</button>
+        </section>
+        <section class="main"></section>
+      </article>
+    </section>
+  </main>
+</div>
+<script>
+(()=>{
+  let display = document.querySelector('.display');
+
+  let viewer0 = display.querySelector('.viewer');
+  viewer0.remove();
+
+  let track0 = display.querySelector('.track');
+  track0.remove();
+
+  let movingObject = null;
+
+  function OpenTrack() {
+    let t = track0.cloneNode();
+    t.dataset.num = display.querySelectorAll('.track').length;
+    display.append(t);
+  }
+
+  function OpenViewer(trackNum, viewer) {
+    let track = display.querySelector('.track[data-num="' + trackNum + '"]');
+    track.append(viewer);
+  }
+
+  function MainSetPos(main, y) {
+    main.dataset.y = y;
+    main.style.backgroundPosition = '50% ' + y + 'px';
+  }
+
+  function MainMouseDown(e) {
+    movingObject = e.currentTarget;
+  }
+
+  function MainMouseMove(e) {
+    if (movingObject && e.buttons != 0) {
+      let main = movingObject;
+      let dy = e.movementY;
+      let y = parseInt(main.dataset.y) + dy;
+      let minY = parseInt(main.dataset.minY);
+      let maxY = parseInt(main.dataset.maxY);
+      if (y < minY) y = minY; else if (y > maxY) y = maxY;
+      MainSetPos(main, y);
+    }
+  }
+
+  function MainMouseUp(e) {
+    movingObject = null;
+  }
+
+  function UpdatePage(viewer) {
+    let main = viewer.querySelector('.main');
+    let input = viewer.querySelector('.menu .page input');
+
+    let p = parseInt(viewer.dataset.page);
+    let key = viewer.dataset.key;
+    input.value = p;
+    let s = '00' + p;
+    s = s.substr(s.length - 3);
+    main.style.backgroundImage = 'url(\'' + key + '_1_png/page-' + s + '.png' + '\')';
+  }
+
+  function SetPage(viewer, p) {
+    let page = parseInt(viewer.dataset.page);
+    let minPage = parseInt(viewer.dataset.minPage);
+    let maxPage = parseInt(viewer.dataset.maxPage);
+    if (p < minPage) p = minPage; else if (p > maxPage) p = maxPage;
+    if (p != page) {
+      viewer.dataset.page = p;
+      UpdatePage(viewer);
+    }
+  }
+
+  function IncPage(e, diff) {
+    let viewer = e.currentTarget.closest('.viewer');
+    let page = parseInt(viewer.dataset.page);
+    let p = page + diff;
+    SetPage(viewer, p);
+  }
+
+  function PrevClick(e) {
+    IncPage(e, -1)
+  }
+
+  function NextClick(e) {
+    IncPage(e, 1)
+  }
+
+  function PageChange(e) {
+    let viewer = e.currentTarget.closest('.viewer');
+    let p = parseInt(e.currentTarget.value);
+    if (isNaN(p)) p = 1;
+    SetPage(viewer, p);
+  }
+
+  function NewViewer(title, key) {
+    let v = viewer0.cloneNode(true);
+    let menu = v.querySelector('.menu');
+    menu.querySelector('.title').innerHTML = title;
+    v.dataset.key = key;
+
+    let main = v.querySelector('.main');
+    v.dataset.page = 1;
+    UpdatePage(v);
+    MainSetPos(main, 0);
+
+    main.addEventListener('mousedown', MainMouseDown);
+    main.addEventListener('mousemove', MainMouseMove);
+    main.addEventListener('mouseup', MainMouseUp);
+
+    menu.querySelector('.prev').addEventListener('click', PrevClick);
+    menu.querySelector('.next').addEventListener('click', NextClick);
+    menu.querySelector('.page input').addEventListener('change', PageChange);
+
+    return v;
+  }
+
+  OpenTrack();
+  OpenTrack();
+  OpenViewer(0, NewViewer('Издание 1937 года', '1937'));
+  OpenViewer(0, NewViewer('Издание 1970 года', '1970'));
+  OpenViewer(1, NewViewer('Новое издание', 'new'));
+})();
+</script>
+</body>
+</html>
