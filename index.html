@@ -130,6 +130,22 @@ body {
 
   let movingObject = null;
 
+  function UpdateHash() {
+    let s = 'show:';
+    let tracks = display.querySelectorAll('.track');
+    let firstT = true;
+    for (let track of tracks) {
+      if (!firstT) s += ':T:'; else firstT = false;
+      let viewers = track.querySelectorAll('.viewer');
+      let firstV = true;
+      for (let viewer of viewers) {
+        if (!firstV) s += ':'; else firstV = false;
+        s += viewer.dataset.key + '-' + viewer.dataset.page;
+      }
+    }
+    location.hash = s;
+  }
+
   function OpenTrack() {
     let t = track0.cloneNode();
     t.dataset.num = display.querySelectorAll('.track').length;
@@ -139,31 +155,115 @@ body {
   function OpenViewer(trackNum, viewer) {
     let track = display.querySelector('.track[data-num="' + trackNum + '"]');
     track.append(viewer);
+    UpdateHash();
   }
 
-  function MainSetPos(main, y) {
-    main.dataset.y = y;
-    main.style.backgroundPosition = '50% ' + y + 'px';
+  function MakeTitle(key) {
+    let s;
+    if (key == 'new') s = 'Новое издание';
+    else if (parseInt(key) == key && key > 1700 & key < 3000)
+      s = 'Издание ' + key + ' года';
+    else s = key + '';
+    return s;
   }
 
-  function MainMouseDown(e) {
-    movingObject = e.currentTarget;
-  }
-
-  function MainMouseMove(e) {
-    if (movingObject && e.buttons != 0) {
-      let main = movingObject;
-      let dy = e.movementY;
-      let y = parseInt(main.dataset.y) + dy;
-      let minY = parseInt(main.dataset.minY);
-      let maxY = parseInt(main.dataset.maxY);
-      if (y < minY) y = minY; else if (y > maxY) y = maxY;
-      MainSetPos(main, y);
+  function LoadTracks() {
+    let s = (location.hash + '').substr(1);
+    let m = s.split(':');
+    if (s == '' || m[0] != 'show') {
+      m = '1937-1:1970-1:T:new-1'.split(':');
+    } else {
+      m = m.slice(1);
+    }
+    OpenTrack();
+    let t = 0;
+    for (let x of m) {
+      if (x == 'T') {
+        OpenTrack();
+        t++;
+      } else {
+        let m2 = x.split('-');
+        let k = m2[0], p = m2[1];
+        let v = NewViewer(MakeTitle(k), k);
+        OpenViewer(t, v);
+        if (p) SetPage(v, p);
+      }
     }
   }
 
+  function MainSetPos(main, x, y) {
+    main.dataset.x = x;
+    main.dataset.y = y;
+    let z = parseInt(main.dataset.zoom);
+    if (z < 100) x = 50;
+    main.style.backgroundPosition = x + '% ' + y + 'px';
+  }
+
+  function MainRefreshPos(main) {
+    MainSetPos(main, Number(main.dataset.x), parseInt(main.dataset.y));
+  }
+
+  function MainSetZoom(main, z) {
+    let y = parseInt(main.dataset.y);
+    let oldZ = main.dataset.zoom;
+    let qz = z / oldZ;
+    if (z < 100) {
+      let maxH = main.clientWidth * z / 100 * 1.8;
+      if (y < 0) y *= qz;
+    } else if (y < 0) {
+      y *= qz;
+    }
+    main.dataset.zoom = z;
+    main.style.backgroundSize = z + '%';
+    MainSetPos(main, Number(main.dataset.x), y);
+  }
+
+  function MainMouseDown(e) {
+    e.preventDefault();
+    movingObject = e.currentTarget;
+  }
+
   function MainMouseUp(e) {
+    e.preventDefault();
     movingObject = null;
+  }
+
+  function MainMouseMove(e) {
+    e.preventDefault();
+    if (movingObject && e.buttons != 0) {
+      let main = movingObject;
+      let dx = -e.movementX;
+      let dy = e.movementY;
+      let z = parseInt(main.dataset.zoom);
+      let w = main.clientWidth;
+      let W = w * z / 100;
+      let x = Number(main.dataset.x);
+      if (W != w) x = x + dx * 100 / (W - w);
+      let y = parseInt(main.dataset.y) + dy;
+      let minY = parseInt(main.dataset.minY) * z / 100;
+      let maxY = parseInt(main.dataset.maxY) * z / 100;
+      if (x < 0) x = 0; else if (x > 100) x = 100;
+      if (y < minY) y = minY; else if (y > maxY) y = maxY;
+      MainSetPos(main, x, y);
+    }
+  }
+
+  function MainWheel(e) {
+    e.preventDefault();
+    let dz = -e.deltaY;
+    if (dz != 0) {
+      if (dz > 0) dz = 1; else dz = -1;
+      let main = e.currentTarget;
+      let z = parseInt(main.dataset.zoom);
+      let newZ = parseInt(z * (1 + dz / 10.0));
+      if (newZ > 40) newZ = Math.round(newZ / 10) * 10;
+      if (z == newZ) z += dz; else z = newZ;
+
+      const minZ = 1;
+      const maxZ = 500;
+      if (z < minZ) z = minZ; else if (z > maxZ) z = maxZ;
+      MainSetZoom(main, z);
+    }
   }
 
   function UpdatePage(viewer) {
@@ -176,6 +276,8 @@ body {
     let s = '00' + p;
     s = s.substr(s.length - 3);
     main.style.backgroundImage = 'url(\'' + key + '_1_png/page-' + s + '.png' + '\')';
+
+    UpdateHash();
   }
 
   function SetPage(viewer, p) {
@@ -220,11 +322,15 @@ body {
     let main = v.querySelector('.main');
     v.dataset.page = 1;
     UpdatePage(v);
-    MainSetPos(main, 0);
+    main.dataset.zoom = 100;
+    main.dataset.minY = -1500;
+    main.dataset.maxY = 3500;
+    MainSetPos(main, 50, 0);
 
     main.addEventListener('mousedown', MainMouseDown);
-    main.addEventListener('mousemove', MainMouseMove);
     main.addEventListener('mouseup', MainMouseUp);
+    main.addEventListener('mousemove', MainMouseMove);
+    main.addEventListener('wheel', MainWheel);
 
     menu.querySelector('.prev').addEventListener('click', PrevClick);
     menu.querySelector('.next').addEventListener('click', NextClick);
@@ -233,11 +339,7 @@ body {
     return v;
   }
 
-  OpenTrack();
-  OpenTrack();
-  OpenViewer(0, NewViewer('Издание 1937 года', '1937'));
-  OpenViewer(0, NewViewer('Издание 1970 года', '1970'));
-  OpenViewer(1, NewViewer('Новое издание', 'new'));
+  LoadTracks();
 })();
 </script>
 </body>
