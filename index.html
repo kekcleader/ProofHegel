@@ -5,10 +5,10 @@
 <title>Сверка «Науки логики»</title>
 <style>
 :root {
-  --bgcolor: #7fa2af;
+  --bgcolor: #98b3bd;
   --fgcolor: #004b68;
   --selcolor: #248146;
-  --highlight: #fff;
+  --highlight: #d5e2e7;
 }
 body {
   margin: 0;
@@ -17,7 +17,7 @@ body {
   color: var(--fgcolor);
   user-select: none;
 }
-body, input, button {
+body, input, button, a {
   cursor: url('images/arrow.png'), default;
 }
 .wrap {
@@ -84,9 +84,10 @@ body, input, button {
 }
 .menu .title {
   font-weight: bold;
-  display: flex;
-  align-items: center;
   padding-left: 0;
+}
+.menu .title b {
+  color: var(--highlight);
 }
 .menu > * {
   padding: 3px 5px;
@@ -124,13 +125,24 @@ body, input, button {
   position: absolute;
   background: var(--bgcolor);
   border: 1px solid var(--fgcolor);
-  padding: 8px;
   width: 130px;
   min-height: 50px;
   top: 21px;
 }
 .edition-menu.open {
   display: block;
+}
+.edition-menu a {
+  display: block;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  color: var(--fgcolor);
+  padding: 2px 4px;
+}
+.edition-menu a:hover {
+  background: var(--fgcolor);
+  color: var(--bgcolor);
 }
 .main {
   flex: 1;
@@ -167,7 +179,16 @@ body, input, button {
     </section>
   </main>
   <div class="edition-menu">
-    Hello
+    <a href="#" data-key="1937_1">1937, том 1</a>
+    <a href="#" data-key="1937_2">1937, том 2</a>
+    <a href="#" data-key="1970_1">1970, книга 1</a>
+    <a href="#" data-key="1970_2">1970, книга 2</a>
+    <a href="#" data-key="1970_3">1970, книга 3</a>
+    <a href="#" data-key="new_1">Новое, книга 1</a>
+    <!--
+    <a href="#" data-key="new_2">Новое, книга 2</a>
+    <a href="#" data-key="new_3">Новое, книга 3</a>
+    -->
   </div>
 </div>
 <script>
@@ -198,6 +219,8 @@ body, input, button {
     document.addEventListener('mouseup', MouseUp);
 
     display.addEventListener('mousedown', DisplayMouseDown);
+
+    document.querySelector('.edition-menu').addEventListener('click', EditionItemClick);
   }
 
   function UpdateHash() {
@@ -231,11 +254,21 @@ body, input, button {
   }
 
   function MakeTitle(key) {
-    let s;
-    if (key == 'new') s = 'Новое издание';
-    else if (parseInt(key) == key && key > 1700 & key < 3000)
-      s = 'Издание ' + key + ' года';
-    else s = key + '';
+    let s = '';
+    let m = key.split('_');
+
+    let y = m[0], vol = m[1];
+    if (y == 'new') s = '<b>Новое</b> изд.';
+    else if (parseInt(y) == y && y > 1700 & y < 3000)
+      s = 'Изд. <b>' + y + '</b> года';
+
+    if (parseInt(vol) == vol && vol > 0 & vol < 500) {
+      if (s) s += ', ';
+      if (y == 'new' || y == 1937 || y == 2017) s += 'т.';
+      else s += 'кн.';
+      s += ' <b>' + vol + '</b>';
+    }
+
     return s;
   }
 
@@ -243,7 +276,7 @@ body, input, button {
     let s = (location.hash + '').substr(1);
     let m = s.split(':');
     if (s == '' || m[0] != 'show') {
-      m = '1937-1:1970-1:T:new-1'.split(':');
+      m = '1937_1-1:1970_1-1:T:new_1-1'.split(':');
     } else {
       m = m.slice(1);
     }
@@ -256,7 +289,7 @@ body, input, button {
       } else {
         let m2 = x.split('-');
         let k = m2[0], p = m2[1];
-        let v = NewViewer(MakeTitle(k), k);
+        let v = NewViewer(k);
         OpenViewer(t, v);
         if (p) SetPage(v, p);
       }
@@ -291,7 +324,7 @@ body, input, button {
   }
 
   function MenuMouseDown(e) {
-    if (e.target?.classList.contains('move-handle') && e.button == 0 && !e.ctrlKey) {
+    if (e.target?.closest('.move-handle') && e.button == 0 && !e.ctrlKey) {
       e.preventDefault();
       document.activeElement?.blur();
       movingMenu = e.currentTarget;
@@ -321,7 +354,7 @@ body, input, button {
         if (lastTrack) {
           OpenTrack();
           let k = track.querySelector('.viewer').dataset.key;
-          let v = NewViewer(MakeTitle(k), k);
+          let v = NewViewer(k);
           OpenViewer(tracks.length, v);
         } else {
           let w = track.offsetWidth;
@@ -442,7 +475,7 @@ body, input, button {
     input.value = p;
     let s = '00' + p;
     s = s.substr(s.length - 3);
-    main.style.backgroundImage = 'url(\'' + key + '_1_png/page-' + s + '.png' + '\')';
+    main.style.backgroundImage = 'url(\'' + key + '_png/page-' + s + '.png' + '\')';
 
     UpdateHash();
   }
@@ -480,7 +513,36 @@ body, input, button {
     SetPage(viewer, p);
   }
 
-  function EditionClick(e) {
+  function SetEdition(viewer, key) {
+    let title = MakeTitle(key);
+    viewer.querySelector('.title').innerHTML = title;
+
+    let main = viewer.querySelector('.main');
+    viewer.dataset.key = key;
+    viewer.dataset.page = 1;
+    viewer.dataset.minPage = 1;
+    viewer.dataset.maxPage = 1000;
+    UpdatePage(viewer);
+    main.dataset.zoom = 100;
+    main.dataset.minY = -1500;
+    main.dataset.maxY = 3500;
+    MainSetPos(main, 50, 0);
+  }
+
+  function EditionItemClick(e) {
+    e.preventDefault();
+    let key = e.target.dataset.key;
+    if (key) {
+      let btn = document.querySelector('.edition.open');
+      let viewer = btn?.closest('.viewer');
+      if (viewer) {
+        SetEdition(viewer, key);
+        btn.dispatchEvent(new Event('mousedown'));
+      }
+    }
+  }
+
+  function EditionMouseDown(e) {
     e.stopPropagation();
     let btn = e.currentTarget;
     let viewer = btn.closest('.viewer');
@@ -501,12 +563,24 @@ body, input, button {
   function CloneClick(e) {
     let viewer = e.currentTarget.closest('.viewer');
     viewer.querySelector('.close').style.display = '';
+    let prevV = viewer.previousElementSibling;
+    let nextV = viewer.nextElementSibling;
     let v = viewer.cloneNode(true);
     viewer.after(v);
     if (viewer.style.height) {
       let h = viewer.clientHeight / 2;
-      SetViewerHeight(viewer, h);
-      SetViewerHeight(v, h);
+      if (prevV) {
+        SetViewerHeight(viewer, h);
+      } else {
+        viewer.style.height = '';
+        viewer.style.flex = '1';
+      }
+      if (nextV) {
+        SetViewerHeight(v, h);
+      } else {
+        v.style.height = '';
+        v.style.flex = '1';
+      }
     }
     InitViewer(v);
     UpdateHash();
@@ -523,7 +597,7 @@ body, input, button {
       if (nextV) {
         SetViewerHeight(prevV, prevV.clientHeight + h);
       } else {
-        prevV.style.height = 'auto';
+        prevV.style.height = '';
         prevV.style.flex = '1';
       }
     } else {
@@ -555,30 +629,17 @@ body, input, button {
     menu.querySelector('.prev').addEventListener('click', PrevClick);
     menu.querySelector('.next').addEventListener('click', NextClick);
     menu.querySelector('.page input').addEventListener('change', PageChange);
-    menu.querySelector('.edition').addEventListener('mousedown', EditionClick);
+    menu.querySelector('.edition').addEventListener('mousedown', EditionMouseDown);
     menu.querySelector('.clone').addEventListener('click', CloneClick);
     menu.querySelector('.close').addEventListener('click', CloseClick);
     menu.querySelector('.zoom100').addEventListener('click', Zoom100Click);
   }
 
-  function NewViewer(title, key) {
+  function NewViewer(key) {
     let v = viewer0.cloneNode(true);
     let menu = v.querySelector('.menu');
-    menu.querySelector('.title').innerHTML = title;
-    v.dataset.key = key;
-
-    let main = v.querySelector('.main');
-    v.dataset.page = 1;
-    v.dataset.minPage = 1;
-    v.dataset.maxPage = 1000;
-    UpdatePage(v);
-    main.dataset.zoom = 100;
-    main.dataset.minY = -1500;
-    main.dataset.maxY = 3500;
-    MainSetPos(main, 50, 0);
-
+    SetEdition(v, key);
     InitViewer(v);
-
     return v;
   }
 
