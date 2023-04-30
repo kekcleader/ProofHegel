@@ -119,14 +119,7 @@ body, input, button {
   flex: 1;
   padding: 0;
 }
-.menu .edition-menu {
-  position: relative;
-  width: 0;
-  height: 0;
-  padding: 0;
-  overflow-x: visible;
-}
-.menu .edition-box {
+.edition-menu {
   display: none;
   position: absolute;
   background: var(--bgcolor);
@@ -136,7 +129,7 @@ body, input, button {
   min-height: 50px;
   top: 21px;
 }
-.menu .edition-menu.open .edition-box {
+.edition-menu.open {
   display: block;
 }
 .main {
@@ -164,10 +157,6 @@ body, input, button {
           <div class="page"><input type="text" value="1"></div>
           <button type="button" class="next btn">След.&nbsp;стр.</button>
           <div class="filler move-handle"></div>
-          <div class="edition-menu">
-            <div class="edition-box">
-            </div>
-          </div>
           <button type="button" class="edition btn">Издание</button>
           <button type="button" class="zoom100 btn">100%</button>
           <button type="button" class="clone btn">Дубль</button>
@@ -177,6 +166,9 @@ body, input, button {
       </article>
     </section>
   </main>
+  <div class="edition-menu">
+    Hello
+  </div>
 </div>
 <script>
 (()=>{
@@ -195,8 +187,8 @@ body, input, button {
   function InitDocument() {
     // Hide popups on click out
     document.addEventListener('mousedown', (e)=>{
-      if (!e.target.closest('.edition-menu, .edition')) {
-        for (let x of document.querySelectorAll('.edition-menu')) {
+      if (!e.target.closest('.edition-menu, .edition.open')) {
+        for (let x of document.querySelectorAll('.edition-menu.open')) {
           x.classList.remove('open');
         }
       }
@@ -489,8 +481,21 @@ body, input, button {
   }
 
   function EditionClick(e) {
-    let viewer = e.currentTarget.closest('.viewer');
-    viewer.querySelector('.edition-menu').classList.toggle('open');
+    e.stopPropagation();
+    let btn = e.currentTarget;
+    let viewer = btn.closest('.viewer');
+    let ed = document.querySelector('.edition-menu');
+    let r = btn.getBoundingClientRect();
+    ed.style.left = r.left + 'px';
+    ed.style.top = (r.bottom - 1) + 'px';
+    if (btn.classList.contains('open')) {
+      ed.classList.remove('open');
+      btn.classList.remove('open');
+    } else {
+      ed.classList.add('open');
+      display.querySelector('.edition.open')?.classList.remove('open');
+      btn.classList.add('open');
+    }
   }
 
   function CloneClick(e) {
@@ -550,7 +555,7 @@ body, input, button {
     menu.querySelector('.prev').addEventListener('click', PrevClick);
     menu.querySelector('.next').addEventListener('click', NextClick);
     menu.querySelector('.page input').addEventListener('change', PageChange);
-    menu.querySelector('.edition').addEventListener('click', EditionClick);
+    menu.querySelector('.edition').addEventListener('mousedown', EditionClick);
     menu.querySelector('.clone').addEventListener('click', CloneClick);
     menu.querySelector('.close').addEventListener('click', CloseClick);
     menu.querySelector('.zoom100').addEventListener('click', Zoom100Click);
