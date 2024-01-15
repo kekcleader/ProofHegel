@@ -188,6 +188,7 @@ body, input, button, a {
     </section>
   </main>
   <div class="edition-menu">
+    <a href="#" data-key="1833_1">1833, том 1</a>
     <a href="#" data-key="1937_1">1937, том 1</a>
     <a href="#" data-key="1937_2">1937, том 2</a>
     <a href="#" data-key="1970_1">1970, книга 1</a>
@@ -325,7 +326,7 @@ body, input, button, a {
 
     if (parseInt(vol) == vol && vol > 0 & vol < 500) {
       if (s) s += ', ';
-      if (y == 'new' || y == 1937 || y == 2017) s += 'т.';
+      if (y == 'new' || y == 1833 || y == 1937 || y == 2017) s += 'т.';
       else s += 'кн.';
       s += ' <b>' + vol + '</b>';
     }
