@@ -160,6 +160,7 @@ body, input, button, a {
   height: 2px;
   background: #f00;
   position: absolute;
+  box-shadow: 0 0 4px 4px rgba(255, 225, 0, 0.2);
 }
 </style>
 </head>
@@ -356,12 +357,52 @@ body, input, button, a {
     }
   }
 
+  function UpdateMark(main) {
+    let mark = main.querySelector('.mark');
+    if (mark) {
+      let oldX = parseFloat(mark.dataset.mainX);
+      let oldY = parseFloat(mark.dataset.mainY);
+      let oldZ = parseFloat(mark.dataset.mainZoom);
+
+      let x = parseFloat(main.dataset.x);
+      let y = parseFloat(main.dataset.y);
+      let z = parseFloat(main.dataset.zoom);
+
+      let markX = parseFloat(mark.style.left);
+      let markY = parseFloat(mark.style.top);
+      let markW = parseFloat(mark.style.width);
+      let w = main.clientWidth;
+      let W = w * z / 100;
+
+      if (oldZ != z) {
+        let q = z / oldZ;
+        markX = (markX - w / 2) * q + w / 2;
+        markY *= q;
+        markW *= q;
+        mark.style.width = markW + 'px';
+      } else if (oldX != x || oldY != y) {
+        if (z > 100) {
+          markX += (oldX - x) / 100 * (W - w);
+        }
+        markY -= (oldY - y) * z / oldZ;
+      }
+
+      mark.style.left = markX + 'px';
+      mark.style.top = markY + 'px';
+
+      mark.dataset.mainX = x;
+      mark.dataset.mainY = y;
+      mark.dataset.mainZoom = z;
+    }
+  }
+
   function MainSetPos(main, x, y) {
     main.dataset.x = x;
     main.dataset.y = y;
     let z = parseInt(main.dataset.zoom);
     if (z < 100) x = 50;
     main.style.backgroundPosition = x + '% ' + y + 'px';
+    UpdateMark(main);
   }
 
   function MainRefreshPos(main) {
@@ -497,6 +538,9 @@ body, input, button, a {
     mark.style.top = y + 'px';
     mark.style.width = minMarkW + 'px';
     mark.style.display = 'block';
+    mark.dataset.mainX = main.dataset.x;
+    mark.dataset.mainY = main.dataset.y;
+    mark.dataset.mainZoom = main.dataset.zoom;
 
     holdingMark = mark;
     holdingMarkX = x;
