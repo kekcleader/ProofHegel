@@ -59,6 +59,7 @@ body, input, button, a {
   color: var(--bgcolor);
   display: flex;
   min-height: 22px;
+  overflow: hidden;
 }
 .menu.moving {
   background: var(--selcolor);
@@ -151,6 +152,14 @@ body, input, button, a {
   background-position: 50% 0;
   background-size: 100%;
   image-rendering: high-quality;
+  overflow: hidden;
+  position: relative;
+}
+.mark {
+  width: 150px;
+  height: 2px;
+  background: #f00;
+  position: absolute;
 }
 </style>
 </head>
@@ -191,6 +200,8 @@ body, input, button, a {
 </div>
 <script>
 (()=>{
+  const minMarkW = 10;
+
   let display = document.querySelector('.display');
 
   let viewer0 = display.querySelector('.viewer');
@@ -202,6 +213,8 @@ body, input, button, a {
   let movingObject = null;
   let movingMenu = null;
   let menuY = null;
+  let holdingMark = null;
+  let holdingMarkX = -1;
 
   function InitDocument() {
     // Hide popups on click out
@@ -215,6 +228,13 @@ body, input, button, a {
 
     // Mouse up
     document.addEventListener('mouseup', MouseUp);
+
+    // Key down
+    document.addEventListener('keydown', (e)=>{
+      if (e.keyCode == 27/*ESC*/) {
+        HideAllMarks();
+      }
+    });
 
     display.addEventListener('mousedown', DisplayMouseDown);
 
@@ -239,14 +259,57 @@ body, input, button, a {
     }
   }
 
-  function OpenTrack() {
-    let t = track0.cloneNode();
-    t.dataset.num = display.querySelectorAll('.track').length;
-    display.append(t);
+  function CloseTrack(track) {
+    let prevT = track.previousElementSibling;
+    let nextT = track.nextElementSibling;
+    if (prevT || nextT) {
+      let w = GetTrackWidth(track);
+      track.remove();
+      if (prevT) {
+        IncTrackWidth(prevT, w);
+      } else {
+        IncTrackWidth(nextT, w);
+      }
+    }
+    UpdateHash();
   }
 
-  function OpenViewer(trackNum, viewer) {
-    let track = display.querySelector('.track[data-num="' + trackNum + '"]');
+  function OpenTrackAndViewer(X, referenceTrack) {
+    let track = OpenTrack(X);
+    let k = referenceTrack.querySelector('.viewer').dataset.key;
+    let v = NewViewer(k);
+    OpenViewer(track, v);
+  }
+
+  function UpdateTrackNums() {
+    let tracks = display.querySelectorAll('.track');
+    for (let i = 0; i < tracks.length; i++) {
+      tracks[i].dataset.num = i;
+    }
+  }
+
+  function OpenTrack(X) {
+    let oldTrack;
+    if (X >= 0) {
+      oldTrack = GetTrackHere(X);
+    }
+    let newTrack = track0.cloneNode();
+    if (oldTrack) {
+      oldTrack.after(newTrack);
+    } else {
+      display.appendChild(newTrack);
+    }
+    UpdateTrackNums();
+    if (oldTrack) {
+      let x = GetTrackX(oldTrack);
+      let w = GetTrackWidth(oldTrack);
+      SetTrackWidth(oldTrack, X - x);
+      SetTrackWidth(newTrack, w - X + x);
+    }
+    return newTrack;
+  }
+
+  function OpenViewer(track, viewer) {
     track.append(viewer);
     UpdateHash();
   }
@@ -278,17 +341,15 @@ body, input, button, a {
     } else {
       m = m.slice(1);
     }
-    OpenTrack();
-    let t = 0;
+    let track = OpenTrack(-1);
     for (let x of m) {
       if (x == 'T') {
-        OpenTrack();
-        t++;
+        track = OpenTrack(-1);
       } else {
         let m2 = x.split('-');
         let k = m2[0], p = m2[1];
         let v = NewViewer(k);
-        OpenViewer(t, v);
+        OpenViewer(track, v);
         if (p) SetPage(v, p);
       }
     }
@@ -331,34 +392,68 @@ body, input, button, a {
     }
   }
 
-  function ResizeTracks(X) {
+  function GetTrackX(track) {
     let tracks = display.querySelectorAll('.track');
-    if (tracks.length > 1) {
-      let track = null;
-      let minDiff = 9999;
-      let lastTrack = false;
-      let x = 0;
-      for (let i = 0; i < tracks.length; i++) {
-        let t = tracks[i];
-        x += t.offsetWidth;
-        let diff = X - x;
-        if (Math.abs(diff) < Math.abs(minDiff)) {
-          track = t;
-          minDiff = diff;
-          if (i == tracks.length - 1) lastTrack = true;
-        }
+    let i = 0, x = 0;
+    while (i != tracks.length && tracks[i] != track) {
+      x += GetTrackWidth(tracks[i]);
+      i++;
+    }
+    return x;
+  }
+
+  function GetTrackHere(X) {
+    let tracks = display.querySelectorAll('.track');
+    let i = 0, x = 0;
+    while (i != tracks.length && !(X < x)) {
+      x += GetTrackWidth(tracks[i]);
+      i++;
+    }
+    if (i != 0) i--;
+    return tracks[i];
+  }
+
+  function ResizeTracks(X) {
+    let track = GetTrackHere(X);
+    let prevT = track.previousElementSibling;
+    let nextT = track.nextElementSibling;
+    let x = GetTrackX(track);
+    let w = GetTrackWidth(track);
+    let leftSide = X - x < w / 2;
+    if (!nextT && (!prevT || !leftSide)) {
+      OpenTrackAndViewer(X, track);
+    } else if (prevT && leftSide) {
+      IncTrackWidth(track, x - X);
+      IncTrackWidth(prevT, X - x);
+    } else {
+      SetTrackWidth(track, X - x);
+      IncTrackWidth(nextT, w - X + x);
+    }
+  }
+
+  function ResizeTracks2(X) {
+    let tracks = display.querySelectorAll('.track');
+    let track = null;
+    let minDiff = 9999;
+    let lastTrack = false;
+    let x = 0;
+    for (let i = 0; i < tracks.length; i++) {
+      let t = tracks[i];
+      x += t.offsetWidth;
+      let diff = X - x;
+      if (Math.abs(diff) < Math.abs(minDiff)) {
+        track = t;
+        minDiff = diff;
+        if (i == tracks.length - 1) lastTrack = true;
       }
-      if (track) {
-        if (lastTrack) {
-          OpenTrack();
-          let k = track.querySelector('.viewer').dataset.key;
-          let v = NewViewer(k);
-          OpenViewer(tracks.length, v);
-        } else {
-          let w = track.offsetWidth;
-          track.style.width = w + minDiff + 'px';
-          track.style.flex = 'none';
-        }
+    }
+    if (track) {
+      if (lastTrack) {
+        OpenTrackAndViewer(X, track);
+      } else {
+        let w = track.offsetWidth;
+        track.style.width = w + minDiff + 'px';
+        track.style.flex = 'none';
       }
     }
   }
@@ -369,14 +464,117 @@ body, input, button, a {
     }
   }
 
+  function HideAllMarks() {
+    let marks = document.querySelectorAll('.viewer .mark');
+    for (let mark of marks) {
+      mark.remove();
+    }
+  }
+
+  function GetMarkInViewer(viewer) {
+    let mark = viewer.querySelector('.mark');
+    if (!mark) {
+      mark = document.createElement('div');
+      mark.classList.add('mark');
+      mark.addEventListener('contextmenu', (e)=>{e.preventDefault()});
+      let main = viewer.querySelector('.main');
+      main.appendChild(mark);
+    }
+    return mark;
+  }
+
+  function ShowMark(e) {
+    let main = e.currentTarget.closest('.main');
+    let viewer = main.closest('.viewer');
+    let mark = GetMarkInViewer(viewer);
+
+    let r = main.getBoundingClientRect();
+    let x = parseInt(e.clientX - r.left);
+    let y = parseInt(e.clientY - r.top);
+
+    mark.style.left = x + 'px';
+    mark.style.top = y + 'px';
+    mark.style.width = minMarkW + 'px';
+    mark.style.display = 'block';
+
+    holdingMark = mark;
+    holdingMarkX = x;
+  }
+
+  function MaybeResizeMark(mark, e) {
+    let main = mark.closest('.main');
+
+    let r = main.getBoundingClientRect();
+    let x2 = parseInt(e.clientX - r.left);
+    let y2 = parseInt(e.clientY - r.top);
+
+    let x = holdingMarkX;
+    let y = parseInt(mark.style.top);
+
+    if (Math.abs(x - x2) * 3 < Math.abs(y - y2) * 2) {
+      mark.style.display = 'none';
+    } else {
+      mark.style.display = 'block';
+      mark.style.top = y2 + 'px';
+      let w = x2 - x;
+      if (w < 0) w = minMarkW - w;
+      if (w >= minMarkW) {
+        if (x2 < x) mark.style.left = x2 + 'px';
+        mark.style.width = w + 'px';
+      }
+    }
+  }
+
   function MainMouseDown(e) {
-    if (e.button == 0) {
+    if (e.button == 0/*Left*/) {
       if (!e.ctrlKey) {
         e.preventDefault();
         document.activeElement?.blur();
         movingObject = e.currentTarget;
       }
+    } else if (e.button == 2/*Right*/) {
+      e.preventDefault();
+      ShowMark(e);
     }
+  }
+
+  function MainMouseUp(e) {
+    if (holdingMark) {
+      MaybeResizeMark(holdingMark, e);
+      holdingMark = null;
+      holdingMarkX = -1;
+    }
+  }
+
+  function GetTrackWidth(track) {
+    return parseInt(track.offsetWidth);
+  }
+
+  function RemoveAllTrackFlex() {
+    let tracks = display.querySelectorAll('.track');
+    for (let i = 0; i < tracks.length; i++) {
+      JustSetTrackWidth(tracks[i], GetTrackWidth(tracks[i]));
+    }
+    for (let i = 0; i < tracks.length; i++) {
+      tracks[i].style.flex = 'none';
+    }
+  }
+
+  function JustSetTrackWidth(track, w) {
+    let nextT = track.nextElementSibling;
+    if (nextT) w--;
+    track.style.width = w + 'px';
+  }
+
+  function SetTrackWidth(track, w) {
+    if (track.style.flex == '') {
+      RemoveAllTrackFlex();
+    }
+    JustSetTrackWidth(track, w);
+  }
+
+  function IncTrackWidth(track, dw) {
+    SetTrackWidth(track, GetTrackWidth(track) + dw);
   }
 
   function SetViewerHeight(viewer, h) {
@@ -384,6 +582,14 @@ body, input, button, a {
     if (h < 22) h = 22; else if (h > maxH) h = maxH;
     viewer.style.height = h + 'px';
     viewer.style.flex = 'none';
+  }
+
+  function SetAllViewersHeight(track) {
+    let viewers = track.querySelectorAll('.viewer');
+    for (let i = 0; i < viewers.length - 1; i++) {
+      let x = viewers[i];
+      SetViewerHeight(x, x.clientHeight);
+    }
   }
 
   function MouseUp(e) {
@@ -402,11 +608,7 @@ body, input, button, a {
       let v = viewer.previousElementSibling;
       if (v) {
         if (!v.style.height) {
-          let viewers = viewer.parentElement.querySelectorAll('.viewer');
-          for (let i = 0; i < viewers.length - 1; i++) {
-            let x = viewers[i];
-            SetViewerHeight(x, x.clientHeight);
-          }
+          SetAllViewersHeight(viewer.closest('.track'));
         }
 
         let h = v.clientHeight;
@@ -443,6 +645,8 @@ body, input, button, a {
       if (x < 0) x = 0; else if (x > 100) x = 100;
       if (y < minY) y = minY; else if (y > maxY) y = maxY;
       MainSetPos(main, x, y);
+    } else if (holdingMark) {
+      MaybeResizeMark(holdingMark, e);
     }
   }
 
@@ -560,7 +764,6 @@ body, input, button, a {
 
   function CloneClick(e) {
     let viewer = e.currentTarget.closest('.viewer');
-    viewer.querySelector('.close').style.display = '';
     let prevV = viewer.previousElementSibling;
     let nextV = viewer.nextElementSibling;
     let v = viewer.cloneNode(true);
@@ -590,22 +793,24 @@ body, input, button, a {
     let prevV = viewer.previousElementSibling;
     let nextV = viewer.nextElementSibling;
     let track = viewer.closest('.track');
-    viewer.remove();
-    if (prevV) {
-      if (nextV) {
-        SetViewerHeight(prevV, prevV.clientHeight + h);
-      } else {
-        prevV.style.height = '';
-        prevV.style.flex = '1';
+    let prevT = track.previousElementSibling;
+    let nextT = track.nextElementSibling;
+    if (prevV || nextV || prevT || nextT) {
+      viewer.remove();
+      if (prevV) {
+        if (nextV) {
+          SetViewerHeight(prevV, prevV.clientHeight + h);
+        } else {
+          prevV.style.height = '';
+          prevV.style.flex = '1';
+        }
+      } else if (!nextV) { // Was the last viewer
+        CloseTrack(track);
+      } else if (nextV.style.height) {
+        SetViewerHeight(nextV, nextV.clientHeight + h);
       }
-    } else {
-      SetViewerHeight(nextV, nextV.clientHeight + h);
+      UpdateHash();
     }
-    let viewers = track.querySelectorAll('.viewer');
-    if (viewers.length == 1) {
-      viewers[0].querySelector('.close').style.display = 'none';
-    }
-    UpdateHash();
   }
 
   function Zoom100Click(e) {
@@ -620,8 +825,10 @@ body, input, button, a {
     let main = v.querySelector('.main');
 
     main.addEventListener('mousedown', MainMouseDown);
+    main.addEventListener('mouseup', MainMouseUp);
     main.addEventListener('mousemove', MainMouseMove);
     main.addEventListener('wheel', MainWheel);
+    main.addEventListener('contextmenu', (e)=>{e.preventDefault()});
 
     menu.addEventListener('mousedown', MenuMouseDown);
     menu.querySelector('.prev').addEventListener('click', PrevClick);
