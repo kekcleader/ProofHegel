@@ -372,15 +372,25 @@ body, input, button, a {
       let markY = parseFloat(mark.style.top);
       let markW = parseFloat(mark.style.width);
       let w = main.clientWidth;
+      let oldW = w * oldZ / 100;
       let W = w * z / 100;
 
       if (oldZ != z) {
         let q = z / oldZ;
-        markX = (markX - w / 2) * q + w / 2;
-        markY *= q;
+        let dy = y;
+
+        let dx1 = oldW / 2 - x / 100 * (oldW - w);
+        if (oldZ < 100) dx1 = w / 2;
+
+        let dx2 = W / 2 - x / 100 * (W - w);
+        if (z < 100) dx2 = w / 2;
+
+        markX = (markX - dx1) * q + dx2;
+        markY = (markY - dy) * q + dy;
         markW *= q;
         mark.style.width = markW + 'px';
-      } else if (oldX != x || oldY != y) {
+      }
+      if (oldX != x || oldY != y) {
         if (z > 100) {
           markX += (oldX - x) / 100 * (W - w);
         }
@@ -421,6 +431,7 @@ body, input, button, a {
     }
     main.dataset.zoom = z;
     main.style.backgroundSize = z + '%';
+    UpdateMark(main);
     MainSetPos(main, Number(main.dataset.x), y);
   }
 
@@ -707,7 +718,7 @@ body, input, button, a {
       if (z == newZ) z += dz; else z = newZ;
 
       const minZ = 1;
-      const maxZ = 500;
+      const maxZ = 1000;
       if (z < minZ) z = minZ; else if (z > maxZ) z = maxZ;
       MainSetZoom(main, z);
     }
