@@ -517,10 +517,15 @@ body, input, button, a {
     }
   }
 
+  function HideMark(viewer) {
+    let mark = viewer.querySelector('.mark');
+    if (mark) mark.remove();
+  }
+
   function HideAllMarks() {
-    let marks = document.querySelectorAll('.viewer .mark');
-    for (let mark of marks) {
-      mark.remove();
+    let viewers = document.querySelectorAll('.viewer');
+    for (let viewer of viewers) {
+      HideMark(viewer);
     }
   }
 
@@ -746,6 +751,7 @@ body, input, button, a {
     if (p != page) {
       viewer.dataset.page = p;
       UpdatePage(viewer);
+      HideMark(viewer);
     }
   }
 
